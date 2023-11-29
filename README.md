@@ -30,7 +30,7 @@ logParser:
   redisPort: 6379
 
 ```
-3. (OPTIONAL) Publish your own image
+3. (OPTIONAL) Publish your own image. <br>
 If you wish to make modification to the script, you will need to deploy your own Docker image. After changing the script, run:
 ```
 docker build -t loki-parser .
