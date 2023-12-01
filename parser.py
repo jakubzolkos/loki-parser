@@ -12,7 +12,7 @@ class LogParser:
         self.v1 = client.CoreV1Api()
         self.namespace = kube_namespace
         self.redis_client = redis.Redis(redis_host, port=redis_port, db=0)
-        self.loki_endpoint = f"http://{loki_host}:{loki_port}/loki/api/v1/push"
+        self.loki_endpoint = f"{loki_host}:{loki_port}/loki/api/v1/push"
 
     @staticmethod
     def write_health_check():
@@ -34,7 +34,7 @@ class LogParser:
             print(f"Error getting logs for pod {pod.metadata.name}: {e}")
             return None
 
-    def send_to_loki(self, logs, pod):
+    def send_to_loki(self, log_line, pod, timestamp):
         try:
             log_entry = {
                 "streams": [
@@ -43,7 +43,7 @@ class LogParser:
                             "pod": pod.metadata.name,
                         },
                         "values": [
-                            [f"{int(time.time() * 1e9)}", logs]
+                            [f"{timestamp}", log_line]
                         ]
                     }
                 ]
@@ -51,9 +51,9 @@ class LogParser:
             headers = {'Content-Type': 'application/json'}
             response = requests.post(self.loki_endpoint, data=json.dumps(log_entry), headers=headers)
             if response.status_code != 204:
-                print(f"Failed to send logs to Loki: {response.text}")
+                print(f"Failed to send log to Loki: {response.text}")
         except Exception as e:
-            print(f"Error sending logs to Loki: {e}")
+            print(f"Error sending log to Loki: {e}")
 
     def process_pod(self, pod):
         pod_key = f"{pod.metadata.namespace}:{pod.metadata.name}"
@@ -70,9 +70,10 @@ class LogParser:
         container_names = [container.name for container in pod.spec.containers]
         for container_name in container_names:
             logs = self.scrape_logs(pod, container_name, since_seconds)
-            if logs:
-                print(logs)
-                self.send_to_loki(logs, pod)
+            for line in logs.split('\n'):
+                if line.strip():
+                    log_timestamp = int(time.time() * 1e9)
+                    self.send_to_loki(line, pod, log_timestamp)
 
         self.redis_client.set(pod_key, str(time.time()))
 
@@ -80,7 +81,7 @@ class LogParser:
         while True:
             pods = self.get_pods().items
             with ThreadPoolExecutor() as executor:
-                logs = list(executor.map(self.process_pod, pods))
+                executor.map(self.process_pod, pods)
             self.write_health_check()
             time.sleep(15)
 

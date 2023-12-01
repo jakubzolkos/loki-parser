@@ -75,10 +75,10 @@ nodeSelector: {}
 tolerations: []
 affinity: {}
 
-# Configuration for LogParser script
+# CONFIGURE THIS
 logParser:
-  namespace: hosting-of-medical-image-analysis-platform-a88466
-  lokiHost: loki-gateway-hosting-of-medical-image-analysis-platform-a88466.apps.shift.nerc.mghpcc.org
+  namespace: ""
+  lokiHost: ""
   lokiPort: 80
-  redisHost: redis.hosting-of-medical-image-analysis-platform-a88466.svc.cluster.local
+  redisHost: ""
   redisPort: 6379
