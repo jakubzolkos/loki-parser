@@ -77,8 +77,8 @@ affinity: {}
 
 # Configuration for LogParser script
 logParser:
-  namespace: default
-  lokiHost: loki-gateway-default.svc.cluster.local
+  namespace: hosting-of-medical-image-analysis-platform-a88466
+  lokiHost: loki-gateway-hosting-of-medical-image-analysis-platform-a88466.apps.shift.nerc.mghpcc.org
   lokiPort: 80
-  redisHost: redis.default.svc.cluster.local
+  redisHost: redis.hosting-of-medical-image-analysis-platform-a88466.svc.cluster.local
   redisPort: 6379

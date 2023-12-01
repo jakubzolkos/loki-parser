@@ -14,6 +14,11 @@ class LogParser:
         self.redis_client = redis.Redis(redis_host, port=redis_port, db=0)
         self.loki_endpoint = f"http://{loki_host}:{loki_port}/loki/api/v1/push"
 
+    @staticmethod
+    def write_health_check():
+        with open('/tmp/health_check', 'w') as file:
+            file.write(str(time.time()))
+
     def get_pods(self):
         return self.v1.list_namespaced_pod(namespace=self.namespace)
 
@@ -76,7 +81,7 @@ class LogParser:
             pods = self.get_pods().items
             with ThreadPoolExecutor() as executor:
                 logs = list(executor.map(self.process_pod, pods))
-                print(logs)
+            self.write_health_check()
             time.sleep(15)
 
 
