@@ -17,18 +17,9 @@ git clone https://github.com/jakubzolkos/loki-parser
 ```
 2. Modify the values.yaml file with your configuration
 - **namespace**: the namespace on your cluster from which you want to scrape logs
-- **lokiHost**: Loki gateway service hostname
-- **lokiPort**: Loki gateway HTTP port
-- **redisHost**: Redis service hostname
-- **redisPort**: Redis server HTTP port
 ```yaml
 logParser:
   namespace: default
-  lokiHost: loki-gateway-default.svc.cluster.local
-  lokiPort: 80
-  redisHost: redis.default.svc.cluster.local
-  redisPort: 6379
-
 ```
 3. (OPTIONAL) Publish your own image. <br>
 If you wish to make modification to the script, you will need to deploy your own Docker image. After changing the script, run:
