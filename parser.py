@@ -6,18 +6,25 @@ import requests
 import argparse
 from kubernetes import client, config
 from concurrent.futures import ThreadPoolExecutor
+from flask import Flask, jsonify
+from threading import Thread
+from waitress import serve
+
+app = Flask(__name__)
+
+@app.route('/health')
+def health_check():
+    return jsonify({"status": "healthy"}), 200
+
+def probe_server():
+    serve(app, host='0.0.0.0', port=8080)
 
 class LogParser:
-    def __init__(self, kube_namespace, loki_host, loki_port, redis_host, redis_port):
+    def __init__(self, kube_namespace):
         self.v1 = client.CoreV1Api()
         self.namespace = kube_namespace
-        self.redis_client = redis.Redis(redis_host, port=redis_port, db=0)
-        self.loki_endpoint = f"{loki_host}:{loki_port}/loki/api/v1/push"
-
-    @staticmethod
-    def write_health_check():
-        with open('/tmp/health_check', 'w') as file:
-            file.write(str(time.time()))
+        self.redis_client = redis.Redis(f"redis.{kube_namespace}.svc.cluster.local", port=6379, db=0)
+        self.loki_endpoint = f"http://loki-gateway.{kube_namespace}.svc.cluster.local:80/loki/api/v1/push"
 
     def get_pods(self):
         return self.v1.list_namespaced_pod(namespace=self.namespace)
@@ -72,6 +79,7 @@ class LogParser:
             logs = self.scrape_logs(pod, container_name, since_seconds)
             for line in logs.split('\n'):
                 if line.strip():
+                    print(line)
                     log_timestamp = int(time.time() * 1e9)
                     self.send_to_loki(line, pod, log_timestamp)
 
@@ -82,10 +90,7 @@ class LogParser:
             pods = self.get_pods().items
             with ThreadPoolExecutor() as executor:
                 executor.map(self.process_pod, pods)
-            self.write_health_check()
-            time.sleep(15)
-
-
+            time.sleep(5)
 def main():
     parser = argparse.ArgumentParser(
         description="Kubernetes/OpenShift Log Parser"
@@ -96,35 +101,6 @@ def main():
         "-n",
         required=False,
         help="The Kubernetes/OpenShift namespace where the application is running. Logs from pods in this namespace will be collected. (default: default)",
-    )
-
-    parser.add_argument(
-        "--loki-host",
-        "-lh",
-        required=False,
-        help="The HTTP route host for the Loki gateway on the cluster. Usually in the form of 'http://loki-gateway-NAMESPACE.PUBLIC_DOMAIN'. (default: localhost)",
-    )
-
-    parser.add_argument(
-        "--loki-port",
-        "-lp",
-        required=False,
-        help="The port of the Loki gateway service. (default: 80)",
-    )
-
-    parser.add_argument(
-        "--redis-host",
-        "-rh",
-        required=False,
-        help="The service hostname or IP address of the Redis server for maintaining timestamp records. Usually in the form of redis.NAMESPACE.svc.cluster.local (default: localhost).",
-    )
-
-    parser.add_argument(
-        "--redis-port",
-        "-rp",
-        required=False,
-        type=int,
-        help="The port of the Redis server. (default: 6379).",
     )
 
     args = parser.parse_args()
@@ -139,21 +115,13 @@ def main():
             exit(1)
 
     kube_namespace = args.namespace or os.getenv("KUBE_NAMESPACE", "default")
-    loki_host = args.loki_host or os.getenv("LOKI_HOST", "localhost")
-    loki_port = args.loki_port or int(os.getenv("LOKI_PORT", 80))
-    redis_host = args.loki_host or os.getenv("REDIS_HOST", "localhost")
-    redis_port = args.loki_port or int(os.getenv("REDIS_PORT", 6379))
+    log_parser = LogParser(kube_namespace=kube_namespace)
 
-    log_parser = LogParser(
-        kube_namespace=kube_namespace,
-        loki_host=loki_host,
-        loki_port=loki_port,
-        redis_host=redis_host,
-        redis_port=redis_port,
-    )
+    flask_thread = Thread(target=probe_server)
+    flask_thread.daemon = True
+    flask_thread.start()
 
     log_parser.run()
 
 if __name__ == "__main__":
     main()
-

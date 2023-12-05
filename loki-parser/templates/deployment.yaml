@@ -52,21 +52,17 @@ spec:
               containerPort: {{ .Values.service.port }}
               protocol: TCP
           livenessProbe:
-            exec:
-              command:
-              - /bin/sh
-              - -c
-              - "test `find /tmp/health_check -mmin -1`"  # Check if file was modified in the last minute
+            httpGet:
+              path: /health
+              port: 8080
             initialDelaySeconds: 30
             periodSeconds: 15
           readinessProbe:
-            exec:
-              command:
-              - /bin/sh
-              - -c
-              - "test `find /tmp/health_check -mmin -1`"  # Similar check for readiness
-          initialDelaySeconds: 15
-          periodSeconds: 15
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- with .Values.volumeMounts }}
